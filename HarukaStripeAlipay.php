@@ -1,5 +1,8 @@
 <?php
+
 use Stripe\StripeClient;
+use WHMCS\Database\Capsule;
+use Illuminate\Database\Schema\Blueprint;
 
 if (!defined("WHMCS")) {
     die("This file cannot be accessed directly");
@@ -36,20 +39,31 @@ function HarukaStripeAlipay_MetaData()
  *
  * @return array
  */
-function HarukaStripeAlipay_config() {
+function HarukaStripeAlipay_config()
+{
+    $schema = Capsule::schema();
+    if (!$schema->hasTable('mod_harukastripepay_invoices')) {
+        $schema->create('mod_harukastripepay_invoices', function (Blueprint $table) {
+            $table->id();
+            $table->integer('invoiceId');
+            $table->string('transId')->nullable();
+            $table->timestamps();
+        });
+    }
+
     return array(
         'FriendlyName' => array(
             'Type' => 'System',
             'Value' => 'Haruka Stripe Alipay',
         ),
         'StripeSkLive' => array(
-            'FriendlyName' => '密钥',
+            'FriendlyName' => 'SK_LIVE 密钥',
             'Type' => 'text',
             'Size' => 30,
             'Description' => '填写从Stripe获取到的密钥（SK_LIVE）',
         ),
         'StripeWebhookKey' => array(
-            'FriendlyName' => 'Stripe Webhook密钥',
+            'FriendlyName' => 'Webhook 密钥',
             'Type' => 'text',
             'Size' => 30,
             'Description' => '填写从Stripe获取到的Webhook密钥签名',
@@ -77,7 +91,8 @@ function HarukaStripeAlipay_config() {
  *
  * @return string
  */
-function HarukaStripeAlipay_link($params){
+function HarukaStripeAlipay_link($params)
+{
     $exchange = exchange($params['currency'], strtoupper($params['StripeCurrency']));
     if (!$exchange) {
         return '<div class="alert alert-danger text-center" role="alert">支付汇率错误，请联系客服进行处理</div>';
@@ -85,49 +100,67 @@ function HarukaStripeAlipay_link($params){
     try {
         $stripe = new Stripe\StripeClient($params['StripeSkLive']);
 
-        // 创建支付方式
-        $paymentMethod = $stripe->paymentMethods->create([
-            'type' => 'alipay'
-        ]);
+        $invoice = Capsule::table('mod_harukastripepay_invoices')
+            ->where('invoiceId', $params['invoiceid'])
+            ->first();
+        $paymentIntent = null;
+        if (!$invoice) {
+            // 创建支付订单
+            $paymentIntent = $stripe->paymentIntents->create([
+                'amount' => floor($params['amount'] * $exchange * 100.00),
+                'currency' => $params['StripeCurrency'],
+                'description' => "invoiceID: " . $params['invoiceid'],
+                'metadata' => [
+                    'invoice_id' => $params['invoiceid'],
+                    'original_amount' => $params['amount']
+                ],
+            ]);
 
-        // 创建支付订单
-        $paymentIntent = $stripe->paymentIntents->create([
-            'amount' => floor($params['amount'] * $exchange * 100.00),
-            'currency' => $params['StripeCurrency'],
-            'payment_method' => $paymentMethod['id'],
-            'metadata' => [
-                'invoice_id' => $params['invoiceid'],
-                'original_amount' => $params['amount']
-            ],
-        ]);
-
-        // 获取订单链接
-        $paymentConfirm = $stripe->paymentIntents->confirm(
-            $paymentIntent['id'],
-            [
-              'return_url' => $params['systemurl'] . 'modules/gateways/harukastripealipay/result.php?order_id=' . $params['invoiceid'],
-            ]
-        );
-    } catch (Exception $e){
+            Capsule::table('mod_harukastripepay_invoices')->insert([
+                'invoiceId' => $params['invoiceid'],
+                'transId' => $paymentIntent->id,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s')
+            ]);
+        } else {
+            $paymentIntent = $stripe->paymentIntents->retrieve($invoice->transId, []);
+        }
+    } catch (Exception $e) {
         return '<div class="alert alert-danger text-center" role="alert">支付网关错误，请联系客服进行处理</div>';
     }
-    if ($paymentConfirm->status == 'requires_action') {
-        $url = explode("?",$paymentConfirm['next_action']['alipay_handle_redirect']['url']);
-        $secret = explode("=",$url[1])[1];
-        return '<form action="'.$url[0].'" method="get"><input type="hidden" name="client_secret" value="'.$secret.'"><input type="submit" class="btn btn-primary" value="'.$params['langpaynow'].'" /></form>';
+    if ($paymentIntent->status == 'requires_payment_method') {
+        $paymentIntent = $stripe->paymentIntents->update($paymentIntent->id, [
+            'payment_method' => $stripe->paymentMethods->create([
+                'type' => 'alipay'
+            ])
+        ]);
     }
+    if ($paymentIntent->status == 'requires_confirmation') {
+        $paymentIntent = $stripe->paymentIntents->confirm(
+            $paymentIntent->id,
+            [
+                'return_url' => $params['systemurl'] . 'modules/gateways/harukastripealipay/return.php?order_id=' . $params['invoiceid'],
+            ]
+        );
+    }
+    if ($paymentIntent->status == 'requires_action') {
+        $url = explode("?", $paymentIntent['next_action']['alipay_handle_redirect']['url']);
+        $secret = explode("=", $url[1])[1];
+        return '<form action="' . $url[0] . '" method="get"><input type="hidden" name="client_secret" value="' . $secret . '"><input type="submit" class="btn btn-primary" value="' . $params['langpaynow'] . '" /></form>';
+    }
+
     return '<div class="alert alert-danger text-center" role="alert">发生错误，请创建工单联系客服处理</div>';
 }
 function exchange($from, $to)
 {
     try {
         $url = 'https://raw.githubusercontent.com/DyAxy/ExchangeRatesTable/main/data.json';
-    
-        $result = file_get_contents($url,false);
+
+        $result = file_get_contents($url, false);
         $result = json_decode($result, true);
-		echo $result['rates'][strtoupper($to)]/$result['rates'][strtoupper($from)];
-    } catch (Exception $e){
-        echo "Exchange error: ".$e;
-        return "Exchange error: ".$e;
+        return $result['rates'][strtoupper($to)] / $result['rates'][strtoupper($from)];
+    } catch (Exception $e) {
+        echo "Exchange error: " . $e;
+        return "Exchange error: " . $e;
     }
 }

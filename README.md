@@ -4,5 +4,6 @@
 
 基于[https://github.com/Kurenai-Network/KurenaiStripeAlipay](https://github.com/Kurenai-Network/KurenaiStripeAlipay)
 
-回调地址：`/modules/gateways/stripealipay/callback.php`
+回调地址：`/modules/gateways/harukastripealipay/callback.php`
+
 侦听事件：`payment_intent.succeeded`

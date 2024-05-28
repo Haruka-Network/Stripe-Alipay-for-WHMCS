@@ -1,6 +1,7 @@
 <?php
 use Stripe\StripeClient;
 use Stripe\Webhook;
+use WHMCS\Database\Capsule;
 
 require_once __DIR__ . '/../../../init.php';
 require_once __DIR__ . '/../../../includes/gatewayfunctions.php';
@@ -30,7 +31,7 @@ try {
     logTransaction($gatewayParams['paymentmethod'], $e, $gatewayName.': Invalid payload');
     http_response_code(400);
     exit();
-} catch(\Stripe\Exception\SignatureVerificationException $e) {
+} catch(Stripe\Exception\SignatureVerificationException $e) {
     logTransaction($gatewayParams['paymentmethod'], $e, $gatewayName.': Invalid signature');
     http_response_code(400);
     exit();
@@ -43,7 +44,7 @@ try {
 
         $paymentIntent = $stripe->paymentIntents->retrieve($paymentId,[]);
 
-        if ($paymentIntent['status'] == 'succeeded') {
+        if ($paymentIntent->status == 'succeeded') {
 
             $invoiceId = checkCbInvoiceID($paymentIntent['metadata']['invoice_id'], $gatewayParams['paymentmethod']);
 			checkCbTransID($paymentId);
