@@ -8,16 +8,6 @@ if (!defined("WHMCS")) {
     die("This file cannot be accessed directly");
 }
 
-/**
- * Define module related meta data.
- *
- * Values returned here are used to determine module related capabilities and
- * settings.
- *
- * @see https://developers.whmcs.com/payment-gateways/meta-data-params/
- *
- * @return array
- */
 function HarukaStripeAlipay_MetaData()
 {
     return array(
@@ -28,17 +18,6 @@ function HarukaStripeAlipay_MetaData()
     );
 }
 
-/**
- * Define gateway configuration options.
- *
- * The fields you define here determine the configuration options that are
- * presented to administrator users when activating and configuring your
- * payment gateway module for use.
- *
- * @see https://developers.whmcs.com/payment-gateways/configuration/
- *
- * @return array
- */
 function HarukaStripeAlipay_config()
 {
     $schema = Capsule::schema();
@@ -73,24 +52,24 @@ function HarukaStripeAlipay_config()
             'Type' => 'text',
             'Size' => 30,
             'Description' => '默认获取WHMCS的货币，与您设置的发起交易货币进行汇率转换，再使用转换后的价格和货币向Stripe请求',
+        ),
+        'RefundFixed' => array(
+            'FriendlyName' => '退款扣除固定金额',
+            'Type' => 'text',
+            'Size' => 30,
+			'Default' => '0.00',
+			'Description' => '$'
+        ),
+        'RefundPercent' => array(
+            'FriendlyName' => '退款扣除百分比金额',
+            'Type' => 'text',
+            'Size' => 30,
+			'Default' => '0.00',
+			'Description' => '%'
         )
     );
 }
 
-/**
- * Payment link.
- *
- * Required by third party payment gateway modules only.
- *
- * Defines the HTML output displayed on an invoice. Typically consists of an
- * HTML form that will take the user to the payment gateway endpoint.
- *
- * @param array $params Payment Gateway Module Parameters
- *
- * @see https://developers.whmcs.com/payment-gateways/third-party-gateway/
- *
- * @return string
- */
 function HarukaStripeAlipay_link($params)
 {
     $exchange = exchange($params['currency'], strtoupper($params['StripeCurrency']));
@@ -150,6 +129,34 @@ function HarukaStripeAlipay_link($params)
     }
 
     return '<div class="alert alert-danger text-center" role="alert">发生错误，请创建工单联系客服处理</div>';
+}
+function HarukaStripeAlipay_refund($params)
+{
+    $stripe = new Stripe\StripeClient($params['StripeSkLive']);
+    $amount = ($params['amount'] - $params['RefundFixed']) / ($params['RefundPercent'] / 100 + 1);
+    try {
+        $responseData = $stripe->refunds->create([
+            'payment_intent' => $params['transid'],
+            'amount' => $amount * 100.00,
+            'metadata' => [
+                'invoice_id' => $params['invoiceid'],
+                'original_amount' => $params['amount'],
+            ]
+        ]);
+        return array(
+            'status' => ($responseData->status === 'succeeded' || $responseData->status === 'pending') ? 'success' : 'error',
+            'rawdata' => $responseData,
+            'transid' => $params['transid'],
+            'fees' => $params['amount'],
+        );
+    } catch (Exception $e) {
+        return array(
+            'status' => 'error',
+            'rawdata' => $e->getMessage(),
+            'transid' => $params['transid'],
+            'fees' => $params['amount'],
+        );
+    }
 }
 function exchange($from, $to)
 {
