@@ -107,6 +107,14 @@ function HarukaStripeAlipay_link($params)
     } catch (Exception $e) {
         return '<div class="alert alert-danger text-center" role="alert">支付网关错误，请联系客服进行处理</div>';
     }
+    if ($paymentIntent->status != 'succeeded' && $paymentIntent->metadata->original_amount != $params['amount']) {
+        $paymentIntent = $stripe->paymentIntents->update($paymentIntent->id, [
+            'amount' => floor($params['amount'] * $exchange * 100.00),
+            'metadata' => [
+                'original_amount' => $params['amount']
+            ],
+        ]);
+    }
     if ($paymentIntent->status == 'requires_payment_method') {
         $paymentIntent = $stripe->paymentIntents->update($paymentIntent->id, [
             'payment_method' => $stripe->paymentMethods->create([
