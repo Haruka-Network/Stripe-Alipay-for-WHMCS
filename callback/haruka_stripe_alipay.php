@@ -52,8 +52,9 @@ try {
                 $gatewayModuleName
             );
             echo "Success to addInvoicePayment\n";
-		}
+        }
     }
+    echo 'Received unhandled event type: ' . $event->type;
 } catch (Exception $e) {
     logTransaction($gatewayParams['name'], $e, 'error-callback');
     http_response_code(400);

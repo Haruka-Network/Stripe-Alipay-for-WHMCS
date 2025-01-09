@@ -58,15 +58,15 @@ function haruka_stripe_alipay_config()
             'FriendlyName' => '退款扣除固定金额',
             'Type' => 'text',
             'Size' => 30,
-			'Default' => '0.00',
-			'Description' => '$'
+            'Default' => '0.00',
+            'Description' => '$'
         ),
         'RefundPercent' => array(
             'FriendlyName' => '退款扣除百分比金额',
             'Type' => 'text',
             'Size' => 30,
-			'Default' => '0.00',
-			'Description' => '%'
+            'Default' => '0.00',
+            'Description' => '%'
         )
     );
 }
