@@ -143,11 +143,11 @@ function haruka_stripe_alipay_link($params)
 function haruka_stripe_alipay_refund($params)
 {
     $stripe = new Stripe\StripeClient($params['StripeSkLive']);
-    $amount = ($params['amount'] - $params['RefundFixed']) / ($params['RefundPercent'] / 100 + 1);
+    $amount = round(($params['amount'] - $params['RefundFixed']) / ($params['RefundPercent'] / 100 + 1), 2) * 100;
     try {
         $responseData = $stripe->refunds->create([
             'payment_intent' => $params['transid'],
-            'amount' => $amount * 100.00,
+            'amount' => (int)$amount,
             'metadata' => [
                 'invoice_id' => $params['invoiceid'],
                 'original_amount' => $params['amount'],
