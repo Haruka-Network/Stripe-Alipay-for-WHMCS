@@ -41,7 +41,7 @@ try {
         if ($paymentIntent->status == 'succeeded') {
             $invoiceId = $paymentIntent['metadata']['invoice_id'];
             $invoiceId = checkCbInvoiceID($invoiceId, $gatewayParams['name']);
-			checkCbTransID($paymentIntent['id']);
+            checkCbTransID($paymentIntent['id']);
             echo "Pass the checkCbTransID check\n";
             logTransaction($gatewayParams['name'], $event, 'Callback successful');
             addInvoicePayment(
@@ -53,8 +53,9 @@ try {
             );
             echo "Success to addInvoicePayment\n";
         }
+    } else {
+        echo 'Received unhandled event type: ' . $event->type;
     }
-    echo 'Received unhandled event type: ' . $event->type;
 } catch (Exception $e) {
     logTransaction($gatewayParams['name'], $e, 'error-callback');
     http_response_code(400);
