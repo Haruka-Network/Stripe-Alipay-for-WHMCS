@@ -1,6 +1,7 @@
 <?php
 
-use Stripe\StripeClient;
+require_once 'stripe-php-16.4.0/init.php';
+
 use WHMCS\Database\Capsule;
 use Illuminate\Database\Schema\Blueprint;
 
@@ -58,15 +59,15 @@ function haruka_stripe_alipay_config()
             'FriendlyName' => '退款扣除固定金额',
             'Type' => 'text',
             'Size' => 30,
-            'Default' => '0.00',
-            'Description' => '$'
+			'Default' => '0.00',
+			'Description' => '$'
         ),
         'RefundPercent' => array(
             'FriendlyName' => '退款扣除百分比金额',
             'Type' => 'text',
             'Size' => 30,
-            'Default' => '0.00',
-            'Description' => '%'
+			'Default' => '0.00',
+			'Description' => '%'
         )
     );
 }
@@ -78,7 +79,7 @@ function haruka_stripe_alipay_link($params)
         return '<div class="alert alert-danger text-center" role="alert">支付汇率错误，请联系客服进行处理</div>';
     }
     try {
-        $stripe = new Stripe\StripeClient($params['StripeSkLive']);
+        $stripe = new \Stripe\StripeClient($params['StripeSkLive']);
 
         $invoice = Capsule::table('mod_harukastripepay_invoices')
             ->where('invoiceId', $params['invoiceid'])
@@ -135,6 +136,7 @@ function haruka_stripe_alipay_link($params)
             return '<form action="' . $url[0] . '" method="get"><input type="hidden" name="client_secret" value="' . $secret . '"><input type="submit" class="btn btn-primary" value="' . $params['langpaynow'] . '" /></form>';
         }
     } catch (Exception $e) {
+        return var_dump($e);
         return '<div class="alert alert-danger text-center" role="alert">支付网关错误，请联系客服进行处理</div>';
     }
     return '<div class="alert alert-danger text-center" role="alert">发生错误，请创建工单联系客服处理</div>';
@@ -142,15 +144,22 @@ function haruka_stripe_alipay_link($params)
 
 function haruka_stripe_alipay_refund($params)
 {
-    $stripe = new Stripe\StripeClient($params['StripeSkLive']);
-    $amount = round(($params['amount'] - $params['RefundFixed']) / ($params['RefundPercent'] / 100 + 1), 2) * 100;
+    $stripe = new \Stripe\StripeClient($params['StripeSkLive']);
     try {
+        $responseData = $stripe->paymentIntents->retrieve($params['transid']);
+        // stripe 收到的金额
+        $amount = $responseData->amount_received;
+        // whmcs 退款金额 / 原始金额 * stripe 收到的金额
+        $amount *= $params['amount'] / $responseData->metadata->original_amount;
+        // 手续费
+        $amount = round(($amount - $params['RefundFixed']) / ($params['RefundPercent'] / 100 + 1), 2);
+
         $responseData = $stripe->refunds->create([
             'payment_intent' => $params['transid'],
             'amount' => (int)$amount,
             'metadata' => [
                 'invoice_id' => $params['invoiceid'],
-                'original_amount' => $params['amount'],
+                'original_amount' => $responseData->metadata->original_amount,
             ]
         ]);
         return array(
