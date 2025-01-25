@@ -1,7 +1,6 @@
 <?php
 
-require_once 'stripe-php-16.4.0/init.php';
-
+use Stripe\StripeClient;
 use WHMCS\Database\Capsule;
 use Illuminate\Database\Schema\Blueprint;
 
