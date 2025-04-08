@@ -147,11 +147,14 @@ function haruka_stripe_alipay_refund($params)
     try {
         $responseData = $stripe->paymentIntents->retrieve($params['transid']);
         // stripe 收到的金额
-        $amount = $responseData->amount_received;
-        // whmcs 退款金额 / 原始金额 * stripe 收到的金额
-        $amount *= $params['amount'] / $responseData->metadata->original_amount;
-        // 手续费
-        $amount = round(($amount - $params['RefundFixed']) / ($params['RefundPercent'] / 100 + 1), 2);
+        $actualAmount = $responseData->amount_received;
+        // whmcs 原始的金额
+        $originalAmount = $params['amount'];
+        // stripe 退款金额
+        $amount = ($originalAmount - $params['RefundFixed']) / ($params['RefundPercent'] / 100 + 1);
+        $amount = $amount / $originalAmount * $actualAmount;
+        $fees = $actualAmount - $amount;
+        $amount = round($amount, 2);
 
         $responseData = $stripe->refunds->create([
             'payment_intent' => $params['transid'],
@@ -165,14 +168,14 @@ function haruka_stripe_alipay_refund($params)
             'status' => ($responseData->status === 'succeeded' || $responseData->status === 'pending') ? 'success' : 'error',
             'rawdata' => $responseData,
             'transid' => $params['transid'],
-            'fees' => $params['amount'],
+            'fees' => $fees,
         );
     } catch (Exception $e) {
         return array(
             'status' => 'error',
             'rawdata' => $e->getMessage(),
             'transid' => $params['transid'],
-            'fees' => $params['amount'],
+            'fees' => $fees,
         );
     }
 }
