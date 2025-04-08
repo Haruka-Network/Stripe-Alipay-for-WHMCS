@@ -146,14 +146,16 @@ function haruka_stripe_alipay_refund($params)
     $stripe = new \Stripe\StripeClient($params['StripeSkLive']);
     try {
         $responseData = $stripe->paymentIntents->retrieve($params['transid']);
-        // stripe 收到的金额
+        
         $actualAmount = $responseData->amount_received;
-        // whmcs 原始的金额
         $originalAmount = $params['amount'];
-        // stripe 退款金额
+
+        // whmcs 退款金额
         $amount = ($originalAmount - $params['RefundFixed']) / ($params['RefundPercent'] / 100 + 1);
+        // whmcs 退款手续费
+        $fees = $originalAmount - $amount;
+        // stripe 退款金额
         $amount = $amount / $originalAmount * $actualAmount;
-        $fees = $actualAmount - $amount;
         $amount = round($amount, 2);
 
         $responseData = $stripe->refunds->create([
