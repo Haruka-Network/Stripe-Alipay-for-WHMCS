@@ -54,6 +54,17 @@ function haruka_stripe_alipay_config()
             'Size' => 30,
             'Description' => '默认获取WHMCS的货币，与您设置的发起交易货币进行汇率转换，再使用转换后的价格和货币向Stripe请求',
         ),
+        'ExchangeType' => array(
+            'FriendlyName' => '获取汇率源',
+            'Type' => 'dropdown',
+            'Options' => array(
+                'neutrino' => '默认源',
+                'wise' => 'Wise 源',
+                'visa' => 'Visa 源',
+                'unionpay' => '银联源',
+            ),
+            'Description' => '支持多种数据源，比较汇率：https://github.com/DyAxy/NewExchangeRatesTable/tree/main/data',
+        ),
         'RefundFixed' => array(
             'FriendlyName' => '退款扣除固定金额',
             'Type' => 'text',
@@ -73,7 +84,7 @@ function haruka_stripe_alipay_config()
 
 function haruka_stripe_alipay_link($params)
 {
-    $exchange = haruka_stripe_alipay_exchange($params['currency'], strtoupper($params['StripeCurrency']));
+    $exchange = haruka_stripe_alipay_exchange($params['currency'], strtoupper($params['StripeCurrency']), strtolower($params['ExchangeType']));
     if (!$exchange) {
         return '<div class="alert alert-danger text-center" role="alert">支付汇率错误，请联系客服进行处理</div>';
     }
@@ -125,7 +136,7 @@ function haruka_stripe_alipay_link($params)
             $paymentIntent = $stripe->paymentIntents->confirm(
                 $paymentIntent->id,
                 [
-                    'return_url' => $params['systemurl'] . '/viewinvoice.php?id=' . $params['invoiceid'],
+                    'return_url' => $params['systemurl'] . 'viewinvoice.php?id=' . $params['invoiceid'],
                 ]
             );
         }
@@ -182,14 +193,14 @@ function haruka_stripe_alipay_refund($params)
     }
 }
 
-function haruka_stripe_alipay_exchange($from, $to)
+function haruka_stripe_alipay_exchange($from, $to, $type)
 {
     try {
-        $url = 'https://raw.githubusercontent.com/DyAxy/ExchangeRatesTable/main/data.json';
+        $url = 'https://raw.githubusercontent.com/DyAxy/NewExchangeRatesTable/main/data/'. $type .'.json';
 
         $result = file_get_contents($url, false);
         $result = json_decode($result, true);
-        return $result['rates'][strtoupper($to)] / $result['rates'][strtoupper($from)];
+        return $result['data'][strtoupper($to)] / $result['data'][strtoupper($from)];
     } catch (Exception $e) {
         echo "Exchange error: " . $e;
         return "Exchange error: " . $e;
