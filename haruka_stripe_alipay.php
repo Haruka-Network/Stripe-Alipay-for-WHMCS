@@ -89,9 +89,12 @@ function haruka_stripe_alipay_link($params)
     if (!$exchange) {
         return '<div class="alert alert-danger text-center" role="alert">支付汇率错误，请联系客服进行处理</div>';
     }
-    
+
+    // 计算转换后支付金额
+    $amount = floor($params['amount'] * $exchange * 100.00);
+
     // 验证支付金额是否满足最小要求
-    $validation = haruka_stripe_alipay_validate_amount($params['amount'], $params['StripeCurrency'], $exchange);
+    $validation = haruka_stripe_alipay_validate_amount($params['StripeCurrency'], $amount);
     if (!$validation['valid']) {
         return '<div class="alert alert-warning text-center" role="alert">' . $validation['error'] . '</div>';
     }
@@ -108,7 +111,7 @@ function haruka_stripe_alipay_link($params)
         if (!$invoice) {
             // 创建支付订单
             $paymentIntent = $stripe->paymentIntents->create([
-                'amount' => floor($params['amount'] * $exchange * 100.00),
+                'amount' => $amount,
                 'currency' => $params['StripeCurrency'],
                 'description' => "invoiceID: " . $params['invoiceid'],
                 'metadata' => [
@@ -130,7 +133,7 @@ function haruka_stripe_alipay_link($params)
         // 更新支付金额
         if ($paymentIntent->status != 'succeeded' && $paymentIntent->metadata->original_amount != $params['amount']) {
             $paymentIntent = $stripe->paymentIntents->update($paymentIntent->id, [
-                'amount' => floor($params['amount'] * $exchange * 100.00),
+                'amount' => $amount,
                 'metadata' => [
                     'original_amount' => $params['amount']
                 ],
@@ -180,6 +183,11 @@ function haruka_stripe_alipay_refund($params)
         // stripe 退款金额
         $amount = $amount / $originalAmount * $actualAmount;
         $amount = round($amount, 2);
+
+        $validation = haruka_stripe_alipay_validate_amount($params['StripeCurrency'], $amount);
+        if (!$validation['valid']) {
+            throw new Exception($validation['error']);
+        }
 
         $responseData = $stripe->refunds->create([
             'payment_intent' => $params['transid'],
@@ -331,7 +339,7 @@ function haruka_stripe_alipay_minimum_amounts_list()
  * @param float $exchange 汇率
  * @return array 包含验证结果和错误信息
  */
-function haruka_stripe_alipay_validate_amount($amount, $currency, $exchange)
+function haruka_stripe_alipay_validate_amount($currency, $amount)
 {
     $minimumAmounts = haruka_stripe_alipay_minimum_amounts_list();
     $currencyUpper = strtoupper($currency);
@@ -343,16 +351,15 @@ function haruka_stripe_alipay_validate_amount($amount, $currency, $exchange)
         ];
     }
 
-    $convertedAmount = floor($amount * $exchange * 100);
     $minimumRequired = $minimumAmounts[$currencyUpper];
 
-    if ($convertedAmount < $minimumRequired) {
+    if ($amount < $minimumRequired) {
         $minimumDisplay = number_format($minimumRequired / 100, 2);
-        $currentDisplay = number_format($convertedAmount / 100, 2);
+        $currentDisplay = number_format($amount / 100, 2);
 
         return [
             'valid' => false,
-            'error' => "支付金额过小。"
+            'error' => "支付金额过小，货币 {$currency} 最低要求为 {$minimumDisplay}，当前为 {$currentDisplay}。"
         ];
     }
 
