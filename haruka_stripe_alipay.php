@@ -159,8 +159,7 @@ function haruka_stripe_alipay_link($params)
         // 处理需要用户操作的状态
         if ($paymentIntent->status == 'requires_action') {
             $url = explode("?", $paymentIntent['next_action']['alipay_handle_redirect']['url']);
-            $secret = explode("=", $url[1])[1];
-            return '<form action="' . $url[0] . '" method="get"><input type="hidden" name="client_secret" value="' . $secret . '"><input type="submit" class="btn btn-primary" value="' . $params['langpaynow'] . '" /></form>';
+            return '<form action="' . $url[0] . '" method="get"><input type="submit" class="btn btn-primary" value="' . $params['langpaynow'] . '" /></form>';
         }
     } catch (Exception $e) {
         return '<div class="alert alert-danger text-center" role="alert">支付网关错误，请联系客服进行处理</div>';
