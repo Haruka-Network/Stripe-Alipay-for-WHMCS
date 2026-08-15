@@ -43,6 +43,7 @@ modules/gateways/
    | Webhook Signing Secret | The endpoint's `whsec_...` |
    | Presentment Currency | Currency charged on Stripe. In practice Alipay requires CNY or your Stripe account's local currency |
    | Exchange Rate Source | Data source for converting the invoice currency into the presentment currency |
+   | Statement Descriptor | Descriptor shown to the customer for non-card charges such as Alipay (`{invoice}` is replaced with the invoice id), overriding the account default; leave empty for the account default |
    | Refund Fixed / Percentage Fee | Fees withheld from refunds |
 
 4. Add a webhook endpoint in the [Stripe Dashboard → Developers → Webhooks](https://dashboard.stripe.com/webhooks):

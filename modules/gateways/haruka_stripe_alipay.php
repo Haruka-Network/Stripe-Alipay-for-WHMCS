@@ -153,6 +153,13 @@ function haruka_stripe_alipay_config()
             'Default' => 'neutrino',
             'Description' => '汇率数据对比：https://github.com/DyAxy/NewExchangeRatesTable/tree/main/data（结果缓存 15 分钟）',
         ],
+        'StatementDescriptor' => [
+            'FriendlyName' => '账单描述',
+            'Type' => 'text',
+            'Size' => '22',
+            'Default' => 'INV {invoice}',
+            'Description' => '展示给客户的账单描述（statement_descriptor，支付宝等非卡支付适用），覆盖 Stripe 账户默认值。{invoice} 会替换为账单号；留空则使用账户默认描述。最长 22 个 ASCII 字符且需含字母',
+        ],
         'RefundFixed' => [
             'FriendlyName' => '退款扣除固定金额',
             'Type' => 'text',

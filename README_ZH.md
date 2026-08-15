@@ -43,6 +43,7 @@ modules/gateways/
    | Webhook 签名密钥 | Webhook 端点的 `whsec_...` |
    | 发起交易货币 | 向 Stripe 请求使用的货币，实测需要 CNY 或开户当地货币才支持支付宝 |
    | 汇率数据源 | 账单货币 → 交易货币的换算数据源 |
+   | 账单描述 | 展示给客户的账单描述（`statement_descriptor`，非卡支付适用），`{invoice}` 替换为账单号；留空则使用 Stripe 账户默认 |
    | 退款扣除固定金额 / 百分比 | 退款时预先扣除的手续费 |
 
 4. 在 [Stripe Dashboard → Developers → Webhooks](https://dashboard.stripe.com/webhooks) 添加端点：

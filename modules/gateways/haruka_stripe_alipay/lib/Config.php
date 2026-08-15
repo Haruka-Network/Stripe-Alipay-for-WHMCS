@@ -67,6 +67,36 @@ class Config
     }
 
     /**
+     * Statement descriptor for the charge, overriding the account default.
+     *
+     * Alipay is a non-card payment method, so the full statement_descriptor
+     * field applies (the card-only statement_descriptor_suffix is ignored,
+     * and cards would reject the full field). The configured template may
+     * contain {invoice}, replaced with the invoice id. The result is
+     * sanitised to Stripe's rules: printable ASCII without < > \ ' " *,
+     * at most 22 characters, and at least one letter — otherwise ''.
+     *
+     * @see https://docs.stripe.com/get-started/account/statement-descriptors
+     *
+     * @param int|string $invoiceId
+     * @return string Sanitised descriptor, or '' to use the account default
+     */
+    public function statementDescriptor($invoiceId)
+    {
+        $template = trim((string) ($this->params['StatementDescriptor'] ?? ''));
+        if ($template === '') {
+            return '';
+        }
+
+        $descriptor = str_replace('{invoice}', (string) $invoiceId, $template);
+        $descriptor = preg_replace('/[^\x20-\x7E]/', '', $descriptor);
+        $descriptor = str_replace(['<', '>', '\\', "'", '"', '*'], '', $descriptor);
+        $descriptor = trim(substr(trim($descriptor), 0, 22));
+
+        return preg_match('/[A-Za-z]/', $descriptor) ? $descriptor : '';
+    }
+
+    /**
      * @return float Fixed fee deducted from refunds, in invoice currency
      */
     public function refundFixedFee()

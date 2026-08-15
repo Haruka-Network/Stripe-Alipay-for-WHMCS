@@ -193,20 +193,24 @@ class StripeGateway
             // Clamp rounding overshoot; anything left over stays on Stripe.
             $minorAmount = min($minorAmount, $remaining);
 
-            $refund = $this->request('Refund Create', function () use ($transactionId, $minorAmount, $params, $alreadyRefunded) {
+            $payload = [
+                'payment_intent' => $transactionId,
+                'amount' => $minorAmount,
+                'metadata' => [
+                    self::META_INVOICE_ID => (string) ($params['invoiceid'] ?? ''),
+                    'whmcs_refund_amount' => (string) ($params['amount'] ?? ''),
+                ],
+            ];
+
+            $refund = $this->request('Refund Create', function () use ($payload, $alreadyRefunded) {
                 return $this->client()->refunds->create(
+                    $payload,
                     [
-                        'payment_intent' => $transactionId,
-                        'amount' => $minorAmount,
-                        'metadata' => [
-                            self::META_INVOICE_ID => (string) ($params['invoiceid'] ?? ''),
-                            'whmcs_refund_amount' => (string) ($params['amount'] ?? ''),
-                        ],
-                    ],
-                    [
-                        // Distinct per remaining balance so an identical retry
-                        // dedupes, while a second same-sized refund goes through.
-                        'idempotency_key' => 'hsa-refund-' . md5($transactionId . '|' . $minorAmount . '|' . $alreadyRefunded),
+                        // Full-payload hash: an identical retry dedupes, any
+                        // difference gets a fresh key. The refunded-so-far salt
+                        // lets a second same-sized refund go through once the
+                        // first has settled.
+                        'idempotency_key' => 'hsa-refund-' . md5(json_encode($payload) . '|' . $alreadyRefunded),
                     ]
                 );
             });
@@ -277,38 +281,34 @@ class StripeGateway
         $rate,
         $replacedIntentId
     ) {
-        // Same click twice -> same key -> one intent. The replaced-intent salt
-        // keeps the key distinct from an earlier intent with equal parameters.
-        $idempotencyKey = 'hsa-pi-' . md5(implode('|', [
-            $invoiceId,
-            $minorAmount,
-            $stripeCurrency,
-            (string) $replacedIntentId,
-        ]));
+        $payload = [
+            'amount' => $minorAmount,
+            'currency' => strtolower($stripeCurrency),
+            'payment_method_types' => ['alipay'],
+            'description' => 'Invoice #' . $invoiceId,
+            'metadata' => [
+                self::META_INVOICE_ID => (string) $invoiceId,
+                self::META_ORIGINAL_AMOUNT => (string) $whmcsAmount,
+                self::META_WHMCS_CURRENCY => $whmcsCurrency,
+                self::META_EXCHANGE_RATE => (string) $rate,
+            ],
+        ];
 
-        return $this->request('PaymentIntent Create', function () use (
-            $invoiceId,
-            $whmcsAmount,
-            $whmcsCurrency,
-            $stripeCurrency,
-            $minorAmount,
-            $rate,
-            $idempotencyKey
-        ) {
+        $descriptor = $this->config->statementDescriptor($invoiceId);
+        if ($descriptor !== '') {
+            $payload['statement_descriptor'] = $descriptor;
+        }
+
+        // Derived from the full request body: an identical double-click replays
+        // the same intent, while ANY payload difference (amount, rate metadata,
+        // descriptor) gets a fresh key instead of Stripe's idempotency_error.
+        // The replaced-intent salt additionally escapes replay when superseding
+        // a dead intent with otherwise identical parameters.
+        $idempotencyKey = 'hsa-pi-' . md5(json_encode($payload) . '|' . (string) $replacedIntentId);
+
+        return $this->request('PaymentIntent Create', function () use ($payload, $idempotencyKey) {
             return $this->client()->paymentIntents->create(
-                [
-                    'amount' => $minorAmount,
-                    'currency' => strtolower($stripeCurrency),
-                    'payment_method_types' => ['alipay'],
-                    'description' => 'Invoice #' . $invoiceId,
-                    'statement_descriptor' => "Invoice #" . $invoiceId,
-                    'metadata' => [
-                        self::META_INVOICE_ID => (string) $invoiceId,
-                        self::META_ORIGINAL_AMOUNT => (string) $whmcsAmount,
-                        self::META_WHMCS_CURRENCY => $whmcsCurrency,
-                        self::META_EXCHANGE_RATE => (string) $rate,
-                    ],
-                ],
+                $payload,
                 ['idempotency_key' => $idempotencyKey]
             );
         });
