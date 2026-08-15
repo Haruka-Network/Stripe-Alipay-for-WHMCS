@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Lint against the oldest supported PHP so newer-syntax slips fail the build
+      - name: Set up PHP 7.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
+          coverage: none
+
+      - name: Lint PHP files
+        run: find modules -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Build release archive
+        run: |
+          zip -r "haruka_stripe_alipay-${GITHUB_REF_NAME}.zip" modules -x '*.DS_Store'
+          unzip -l "haruka_stripe_alipay-${GITHUB_REF_NAME}.zip"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            "haruka_stripe_alipay-${GITHUB_REF_NAME}.zip"

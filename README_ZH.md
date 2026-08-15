@@ -33,7 +33,7 @@ modules/gateways/
 
 ## 安装
 
-1. 将仓库中的 `modules/` 目录上传到 WHMCS 根目录（与现有 `modules/` 合并）。
+1. 从 [Releases](https://github.com/Haruka-Network/Stripe-Alipay-for-WHMCS/releases) 下载最新的 zip 包解压到 WHMCS 根目录（或直接上传仓库中的 `modules/` 目录，与现有 `modules/` 合并）。
 2. WHMCS 后台 → System Settings → Payment Gateways 中激活 **Haruka Stripe Alipay**。
 3. 填写配置：
 

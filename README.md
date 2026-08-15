@@ -33,7 +33,7 @@ modules/gateways/
 
 ## Installation
 
-1. Upload the repository's `modules/` directory into your WHMCS root (merging with the existing `modules/`).
+1. Download the latest zip from [Releases](https://github.com/Haruka-Network/Stripe-Alipay-for-WHMCS/releases) and extract it into your WHMCS root (or upload the repository's `modules/` directory, merging with the existing `modules/`).
 2. Activate **Haruka Stripe Alipay** under System Settings → Payment Gateways.
 3. Fill in the settings:
 
