@@ -1,70 +1,72 @@
+**English** | [简体中文](README_ZH.md)
+
 # Stripe Alipay for WHMCS
 
-通过 Stripe PaymentIntents 在 WHMCS 中收取支付宝付款的第三方网关模块。
+A third-party payment gateway module that accepts Alipay payments in WHMCS through Stripe PaymentIntents.
 
-点击账单上的支付按钮后直接拉起支付宝支付页面（支持 PC / 移动端）。账单金额会按可选的汇率源换算为你配置的 Stripe 交易货币后发起支付；到账由验签后的 Webhook 自动入账；支持部分退款，并可配置固定与百分比退款手续费。
+Clicking the pay button on an invoice takes the customer straight to the Alipay payment page (desktop and mobile). The invoice amount is converted into your configured Stripe presentment currency using a selectable exchange-rate source; payments are credited automatically by a signature-verified webhook; partial refunds are supported with configurable fixed and percentage refund fees.
 
-> 2024 年 8 月起 Stripe 移除了 Source API，本模块使用 [PaymentIntents 的 Alipay direct API 流程](https://docs.stripe.com/payments/alipay/accept-a-payment?payment-ui=direct-api)。
+> Stripe removed the Source API in August 2024. This module uses the [PaymentIntents Alipay direct API flow](https://docs.stripe.com/payments/alipay/accept-a-payment?payment-ui=direct-api).
 
-## 功能特性
+## Features
 
-- **支付**：Alipay 重定向支付流程，PaymentIntent 按账单复用，重复点击不会产生重复订单（幂等键）
-- **汇率**：支持 Neutrino / Wise / Visa / 银联 / Coinbase 多个[数据源](https://github.com/DyAxy/NewExchangeRatesTable/tree/main/data)，结果缓存 15 分钟，源站不可用时回退最近一次成功数据（最长 24 小时）
-- **入账**：Webhook 使用官方 SDK 验签，按 WHMCS 回调规范校验账单与重复交易后入账
-- **退款**：支持部分退款；按「固定金额 + 百分比」扣除手续费后，按实际支付比例换算为 Stripe 货币退款
-- **货币**：正确处理 JPY 等零小数货币，校验 Stripe 最小/最大收款金额，交易货币限定为 Alipay 支持的货币
-- **性能**：账单页只渲染支付按钮，点击后才请求 Stripe 与汇率源，账单页加载不再依赖外部服务
+- **Payments**: Alipay redirect flow. One PaymentIntent is reused per invoice, and idempotency keys ensure repeated clicks never create duplicate charges
+- **Exchange rates**: multiple [data sources](https://github.com/DyAxy/NewExchangeRatesTable/tree/main/data) (Neutrino / Wise / Visa / UnionPay / Coinbase), cached for 15 minutes, with fallback to the last successful table (up to 24 hours) when the source is unreachable
+- **Crediting**: webhooks are verified with the official SDK, then processed following the WHMCS callback conventions (invoice validation, duplicate transaction protection)
+- **Refunds**: partial refunds supported; a fixed fee plus a percentage fee is withheld, and the remainder is refunded on Stripe proportionally to the captured charge
+- **Currencies**: correct handling of zero-decimal currencies such as JPY, validation against Stripe minimum/maximum charge amounts, presentment currency restricted to Alipay-supported currencies
+- **Performance**: invoice pages only render a payment button — Stripe and the rate source are contacted only after the customer clicks, so invoice pages never block on external services
 
-## 目录结构
+## Directory layout
 
 ```
 modules/gateways/
-├── haruka_stripe_alipay.php            # 网关入口（MetaData / config / link / refund）
+├── haruka_stripe_alipay.php            # Gateway entry (MetaData / config / link / refund)
 ├── callback/
-│   └── haruka_stripe_alipay.php        # Stripe Webhook 回调端点
+│   └── haruka_stripe_alipay.php        # Stripe webhook endpoint
 └── haruka_stripe_alipay/
-    ├── pay.php                         # 支付跳转处理（支付按钮的提交目标）
-    ├── whmcs.json                      # WHMCS 后台读取的模块元数据
-    ├── composer.json                   # 可选：独立安装 Stripe SDK
-    └── lib/                            # 模块类库（HarukaStripeAlipay 命名空间）
+    ├── pay.php                         # Payment redirect handler (pay button target)
+    ├── whmcs.json                      # Module metadata read by the WHMCS admin
+    ├── composer.json                   # Optional: standalone Stripe SDK install
+    └── lib/                            # Module classes (HarukaStripeAlipay namespace)
 ```
 
-## 安装
+## Installation
 
-1. 将仓库中的 `modules/` 目录上传到 WHMCS 根目录（与现有 `modules/` 合并）。
-2. WHMCS 后台 → System Settings → Payment Gateways 中激活 **Haruka Stripe Alipay**。
-3. 填写配置：
+1. Upload the repository's `modules/` directory into your WHMCS root (merging with the existing `modules/`).
+2. Activate **Haruka Stripe Alipay** under System Settings → Payment Gateways.
+3. Fill in the settings:
 
-   | 配置项 | 说明 |
+   | Setting | Description |
    | --- | --- |
-   | Stripe 密钥 | Stripe 后台的 `sk_live_...`（测试环境 `sk_test_...`） |
-   | Webhook 签名密钥 | Webhook 端点的 `whsec_...` |
-   | 发起交易货币 | 向 Stripe 请求使用的货币，实测需要 CNY 或开户当地货币才支持支付宝 |
-   | 汇率数据源 | 账单货币 → 交易货币的换算数据源 |
-   | 退款扣除固定金额 / 百分比 | 退款时预先扣除的手续费 |
+   | Stripe Secret Key | `sk_live_...` from the Stripe Dashboard (`sk_test_...` for test mode) |
+   | Webhook Signing Secret | The endpoint's `whsec_...` |
+   | Presentment Currency | Currency charged on Stripe. In practice Alipay requires CNY or your Stripe account's local currency |
+   | Exchange Rate Source | Data source for converting the invoice currency into the presentment currency |
+   | Refund Fixed / Percentage Fee | Fees withheld from refunds |
 
-4. 在 [Stripe Dashboard → Developers → Webhooks](https://dashboard.stripe.com/webhooks) 添加端点：
+4. Add a webhook endpoint in the [Stripe Dashboard → Developers → Webhooks](https://dashboard.stripe.com/webhooks):
 
-   - 地址：`https://你的域名/modules/gateways/callback/haruka_stripe_alipay.php`
-   - 事件：`payment_intent.succeeded`（可选添加 `payment_intent.payment_failed`、`charge.refunded` 以便记录日志）
+   - URL: `https://your-domain/modules/gateways/callback/haruka_stripe_alipay.php`
+   - Event: `payment_intent.succeeded` (optionally add `payment_intent.payment_failed` and `charge.refunded` for logging)
 
-模块使用 WHMCS 自带的 `stripe/stripe-php` SDK，无需额外安装。若你的环境缺少该 SDK，在 `modules/gateways/haruka_stripe_alipay/` 下执行 `composer install` 即可。
+The module uses the `stripe/stripe-php` SDK bundled with WHMCS — no extra install needed. If your environment lacks the SDK, run `composer install` inside `modules/gateways/haruka_stripe_alipay/`.
 
-## 从 v1.x 升级
+## Upgrading from v1.x
 
-- 直接用新目录结构覆盖即可，数据表 `mod_harukastripepay_invoices` 与全部配置项名称保持不变。
-- 密钥字段类型改为了 password（存储加密）：**升级后需在网关设置中重新填写 Stripe 密钥与 Webhook 签名密钥并保存一次**。
-- v1.x 中在账单页直接完成的 Stripe 请求已移至点击支付按钮之后，支付流程与回调地址不变。
+- Deploy the new directory layout over the old files. The `mod_harukastripepay_invoices` table and all setting names are unchanged.
+- The key fields are now `password` type (stored encrypted): **after upgrading, re-enter the Stripe secret key and the webhook signing secret once and save**.
+- Stripe requests that v1.x made while rendering the invoice page now happen only after the customer clicks the pay button. The payment flow and the callback URL are unchanged.
 
-## 调试
+## Debugging
 
-- **Billing → Gateway Log**：Webhook 入账、支付失败、Stripe 后台退款等交易日志。
-- **Configuration → System Logs → Module Log**（开启 Debug Logging 后）：每次 Stripe API 调用的摘要，密钥自动脱敏。
+- **Billing → Gateway Log**: transaction log entries for webhook crediting, failed payments, and refunds made from the Stripe Dashboard.
+- **Configuration → System Logs → Module Log** (with Debug Logging enabled): a summary of every Stripe API call, with secrets automatically redacted.
 
-## 已知限制
+## Known limitations
 
-- Stripe Dashboard 中手工发起的退款只会记录到 Gateway Log，不会自动写入 WHMCS 交易记录（在 WHMCS 中发起的退款会正常记录）。
-- Alipay 不支持拒付（dispute）流程，也不支持手动 capture。
+- Refunds initiated from the Stripe Dashboard are only written to the Gateway Log; they are not applied to WHMCS transactions automatically (refunds initiated from WHMCS are recorded normally).
+- Alipay does not support disputes or manual capture.
 
 ## License
 
