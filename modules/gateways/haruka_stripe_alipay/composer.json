@@ -1,0 +1,12 @@
+{
+    "name": "dyaxy/haruka-stripe-alipay-sdk",
+    "description": "Optional standalone Stripe SDK install for the Haruka Stripe Alipay gateway module. WHMCS already bundles stripe/stripe-php; run composer install here only if the SDK is missing from your installation.",
+    "license": "MIT",
+    "require": {
+        "php": ">=7.4",
+        "stripe/stripe-php": "^13.0 || ^14.0 || ^15.0 || ^16.0 || ^17.0"
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

@@ -1,0 +1,21 @@
+{
+    "schema": "1.0",
+    "type": "whmcs-gateways",
+    "name": "haruka_stripe_alipay",
+    "license": "MIT",
+    "category": "payments",
+    "description": {
+        "name": "Haruka Stripe Alipay",
+        "tagline": "Accept Alipay payments through Stripe PaymentIntents."
+    },
+    "support": {
+        "homepage": "https://github.com/Haruka-Network/Stripe-Alipay-for-WHMCS",
+        "docs_url": "https://github.com/Haruka-Network/Stripe-Alipay-for-WHMCS#readme"
+    },
+    "authors": [
+        {
+            "name": "DyAxy",
+            "homepage": "https://github.com/DyAxy"
+        }
+    ]
+}

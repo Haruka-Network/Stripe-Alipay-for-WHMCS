@@ -1,0 +1,4 @@
+.DS_Store
+.claude/
+/modules/gateways/haruka_stripe_alipay/vendor/
+/modules/gateways/haruka_stripe_alipay/composer.lock
